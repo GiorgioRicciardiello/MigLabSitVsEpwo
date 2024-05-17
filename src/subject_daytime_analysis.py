@@ -137,11 +137,11 @@ if __name__ == '__main__':
         f.write(model1.summary().as_text())
 
     path_m2 = config.get('results_path').joinpath('FA_fa2_ols_summary.txt')
-    with open("FA_fa2_ols_summary.txt", "w") as f:
+    with open(path_m2, "w") as f:
         f.write(model2.summary().as_text())
 
     path_m3 = config.get('results_path').joinpath('FA_fa3_ols_summary.txt')
-    with open("FA_fa3_ols_summary.txt", "w") as f:
+    with open(path_m3, "w") as f:
         f.write(model3.summary().as_text())
     # %% Plots
     plt.figure(figsize=(12, 10))  # You can adjust the size as needed
