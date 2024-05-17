@@ -4,7 +4,7 @@ Dep. Variable:                Factor3   R-squared:                       0.020
 Model:                            OLS   Adj. R-squared:                 -0.004
 Method:                 Least Squares   F-statistic:                    0.8421
 Date:                Thu, 16 May 2024   Prob (F-statistic):              0.521
-Time:                        20:39:41   Log-Likelihood:                -287.13
+Time:                        21:23:27   Log-Likelihood:                -287.13
 No. Observations:                 215   AIC:                             586.3
 Df Residuals:                     209   BIC:                             606.5
 Df Model:                           5                                         

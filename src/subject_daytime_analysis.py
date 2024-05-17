@@ -132,12 +132,15 @@ if __name__ == '__main__':
         data=df).fit()
     print(model3.summary())
 
-    with open("FA_fa1_ols_summary.txt", "w") as f:
+    path_m1 = config.get('results_path').joinpath('FA_fa1_ols_summary.txt')
+    with open(path_m1, "w") as f:
         f.write(model1.summary().as_text())
 
+    path_m2 = config.get('results_path').joinpath('FA_fa2_ols_summary.txt')
     with open("FA_fa2_ols_summary.txt", "w") as f:
         f.write(model2.summary().as_text())
 
+    path_m3 = config.get('results_path').joinpath('FA_fa3_ols_summary.txt')
     with open("FA_fa3_ols_summary.txt", "w") as f:
         f.write(model3.summary().as_text())
     # %% Plots
