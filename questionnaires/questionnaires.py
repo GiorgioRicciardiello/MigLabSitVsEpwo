@@ -16,6 +16,8 @@ class SituationalSleepinessScale:
                        'Not applicable':4,
                        'Prefer not to answer':5}
         self.questionnaire = {
+            # TODO: try to figure a way to put the SS1 RENAME AS SSG because it is a general question so the numbering
+            #  should go until 10
             'sss1': {
                 'label': 'Over the past two weeks, how likely is it that you would unintentionally fall asleep or doze off?',
                 'levels': [*self.levels.keys()]},
@@ -69,6 +71,26 @@ class SituationalSleepinessScale:
         else:
             return 0
 
+    def get_labels(self) -> dict:
+        """Shorter version of the question name to use in the plots and figures"""
+        return {
+            # TODO: try to figure a way to put the SS1 RENAME AS SSG because it is a general question so the numbering
+            #  should go until 10
+            'sss1': 'Unintentional sleep\nlikelihood',
+            'sss2': 'On computer/tablet',
+            'sss3': 'Talking on\nphone',
+            'sss4': 'Meeting',
+            'sss5': 'Listening\nSpeaker',
+            'sss6': 'Board game',
+            'sss7': 'Driving',
+            'sss8': 'Videogame',
+            'sss9': 'Lying\ndown(SSS)',
+            'sss10': 'Traveling\npassenger',
+            'sss11': 'Watching\nmovie',
+            'sss_score': 'SSS Score',
+        }
+
+    pass
 
 
 class EpworthScale:
@@ -83,21 +105,21 @@ class EpworthScale:
                        'High chance of dozing':3}
 
         self.questionnaire = {
-            'ess1': {'label': 'Sitting and reading',
+            'ess1': {'label': 'Sitting/reading',
                      'levels': [*self.levels.keys()]},
             'ess2': {'label': 'Watching TV',
                      'levels': [*self.levels.keys()]},
-            'ess3': {'label': 'Sitting, inactive in a public place (e.g., a theater or a meeting)',
+            'ess3': {'label': 'Sitting inactive',
                      'levels': [*self.levels.keys()]},
-            'ess4': {'label': 'As a passenger in a car for an hour without a break',
+            'ess4': {'label': 'Car passenger',
                      'levels': [*self.levels.keys()]},
-            'ess5': {'label': 'Lying down to rest in the afternoon when circumstances permit',
+            'ess5': {'label': 'Lying down (ESS)',
                      'levels': [*self.levels.keys()]},
-            'ess6': {'label': 'Sitting and talking to someone',
+            'ess6': {'label': 'Talking to someone',
                      'levels': [*self.levels.keys()]},
-            'ess7': {'label': 'Sitting quietly after lunch without alcohol',
+            'ess7': {'label': 'Sitting after lunch',
                      'levels': [*self.levels.keys()]},
-            'ess8': {'label': 'In a car, while stopped for a few minutes in traffic',
+            'ess8': {'label': 'Car in traffic',
                      'levels': [*self.levels.keys()]}
         }
 
@@ -111,3 +133,16 @@ class EpworthScale:
             return 1
         else:
             return 0
+    def get_labels(self) -> dict:
+        """Shorter version of the question name to use in the plots and figures"""
+        return {
+            'ess1': 'Sitting/reading',
+            'ess2': 'Watching TV',
+            'ess3': 'Sitting\ninactive',
+            'ess4': 'Car\npassenger',
+            'ess5': 'Lying\ndown(ESS)',
+            'ess6': 'Talking to\nsomeone',
+            'ess7': 'Sitting after\nlunch',
+            'ess8': 'Car in\ntraffic',
+            'ess_score': 'ESS Score',
+        }

@@ -3,7 +3,7 @@ import pandas as pd
 import statsmodels.api as sm
 from typing import Union, Optional, Tuple
 import numpy as np
-from config.config import config, mapper
+from config.config import config, mapper_diagnosis
 import matplotlib.pyplot as plt
 from scipy.stats import mannwhitneyu, ttest_ind
 import seaborn as sns
@@ -14,7 +14,7 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.cluster import KMeans
 from matplotlib.gridspec import GridSpec
 
-sns.set_context('talk')
+sns.set_context('poster')
 #  'paper', 'notebook', 'talk', and 'poster'
 
 def get_min_max(frame: pd.DataFrame, col: str) -> list[int, int]:
@@ -141,26 +141,46 @@ if __name__ == '__main__':
     # %% define the questionnaire classes
     ess_quest = EpworthScale()
     sit_quest = SituationalSleepinessScale()
+
+    # Get the labels
+    ess_labels = ess_quest.get_labels()
+    sss_labels = sit_quest.get_labels()
+
     # %% 1. Correlation among features
     questions_score = col_ess + col_sss
     questions_no_score = [ques for ques in questions_score if 'score' not in ques]
-    corr_questions = df_data[questions_score].corr(method='spearman')
+    corr_questions = df_data[questions_no_score].corr(method='spearman')
     # get only the correlation heatmap when the questionnaires are being compared
     corr_df_masked = corr_questions.loc[corr_questions.index.str.startswith("sss"), corr_questions.columns.str.startswith("ess")]
-
-    plt.figure(figsize=(12, 10))  # You can adjust the size as needed
-    cbar_kws = {'label': 'Correlation coefficient', 'ticks': 10}
+    lbl_sit_corr = {key: val for key, val in sss_labels.items() if 'score' not in key}
+    lbl_ess_corr = {key: val for key, val in ess_labels.items() if 'score' not in key}
+    plt.figure(figsize=(20, 18))  # You can adjust the size as needed
+    # cbar_kws = {'label': 'Correlation coefficient', 'ticks': 10}
     cmp_heatmap = sns.color_palette("Spectral_r", as_cmap=True)
-    sns.heatmap(corr_df_masked,
+    ax = sns.heatmap(corr_df_masked,
                 annot=True,
                 fmt=".2f",
                 cmap=cmp_heatmap,
                 cbar_kws={'label': 'Correlation coefficient'})
-    plt.title('Spearman Correlation Heatmap of Questionnaire Responses')
+    plt.title(f'Spearman Correlation of \n Questionnaire Responses - Observations: {df_data.shape[0]}')
     plt.xlabel(lbls.get('ess'))
     plt.ylabel(lbls.get('sss'))
-    plt.xticks(rotation=45)
-    plt.yticks(rotation=0)
+
+    # Center the ticks with the boxes
+    ax.set_xticks(ticks=np.arange(len(corr_df_masked.columns)) + 0.5,
+                  labels=[lbl_ess_corr.get(col, col) for col in corr_df_masked.columns],
+                  rotation=45, ha='right'
+                  )
+    ax.set_yticks(ticks=np.arange(len(corr_df_masked.index)) + 0.5,
+                  labels=[lbl_sit_corr.get(row, row) for row in corr_df_masked.index],
+                  rotation=0
+                  )
+    # plt.xticks(ticks=np.arange(len(lbl_ess_corr)),
+    #            labels=[lbl_ess_corr.get(col, col) for col in corr_df_masked.columns],
+    #            rotation=45, ha='right')
+    # plt.yticks(ticks=np.arange(len(lbl_sit_corr)),
+    #            labels=[lbl_sit_corr.get(row, row) for row in corr_df_masked.index],
+    #            rotation=0)
     plt.tight_layout()
     plt.savefig(config.get('results_path').joinpath('correlation_ess_sss.png'), dpi=300)
     plt.show()
@@ -184,10 +204,27 @@ if __name__ == '__main__':
     print(result.summary())
     alpha = result.params['intercept']
     beta = result.params['ess_score']
+    result_summary = {
+        'params': result.params.to_dict(),
+        'pvalues': result.pvalues.to_dict(),
+        'rsquared': result.rsquared,
+        'rsquared_adj': result.rsquared_adj,
+        'fvalue': result.fvalue,
+        'f_pvalue': result.f_pvalue,
+        'conf_int': result.conf_int().to_dict(),
+        'nobs': result.nobs,
+        'df_model': result.df_model,
+        'df_resid': result.df_resid
+    }
+
+    # Save as JSON
+    with open(config.get('results_path').joinpath('Regression_ess_sss_scores_summary.json'), 'w') as f:
+        json.dump(result_summary, f, indent=4)
+
     # comparing two continous outcomes, we can use a t-test
     xminmax = get_min_max(frame=df_data, col='ess_score')
     yminmax = get_min_max(frame=df_data, col='sss_score')
-    plt.figure(figsize=(14, 8))
+    plt.figure(figsize=(20, 14))
     sns.scatterplot(data=df_data,
                     x='ess_score',
                     y='sss_score',
@@ -208,7 +245,7 @@ if __name__ == '__main__':
              y_vals,
              'r-',
              label=f' y = {alpha:.2f} + {beta:.2f} x ESS')
-    plt.title('Comparison of ESS and SSS Scores')
+    plt.title(f'Comparison of ESS and SSS Scores\n Sample Size {df_data.shape[0]}')
     plt.xlabel(lbls.get('ess'))
     plt.ylabel(lbls.get('sss'))
     plt.xlim(xminmax)
@@ -233,7 +270,100 @@ if __name__ == '__main__':
     with open(path, 'w', encoding='utf-8') as f:
         json.dump(ttest_results, f, ensure_ascii=False, indent=4)
 
-    # %% 2. Comparing the responses
+    # %% 2.2 comparison of the scores with diagnosis as hues
+    # to make a pried box plot, we need to have the dataset in long form
+    df_box_scatter = df_data[['sss_score', 'ess_score', 'insomnia', 'narc_level',
+                              'osa_level_ahi_3per', 'osa_level_ahi_4per',
+                              'osa_level_odi_3per', 'osa_level_odi_4per']].copy()
+
+    diagnosis_categories = ['insomnia', 'narc_level','osa_level_ahi_3per', 'osa_level_ahi_4per',
+                              'osa_level_odi_3per', 'osa_level_odi_4per']
+
+    df_melted = pd.melt(df_box_scatter,
+                        id_vars=['insomnia', 'narc_level', 'osa_level_ahi_3per', 'osa_level_ahi_4per'],
+                        value_vars=['sss_score', 'ess_score'],
+                        var_name='score_type',
+                        value_name='score_value')
+
+    palette = {"sss_score": "skyblue", "ess_score": "salmon"}
+
+    fig = plt.figure(figsize=(22, 20))
+    gs = GridSpec(nrows=2, ncols=2, wspace=0.2, hspace=0.4)
+    ax_insomnia = fig.add_subplot(gs[0,0])
+    ax_narc = fig.add_subplot(gs[0, 1])
+    ax_osa_ahi_3per = fig.add_subplot(gs[1, 0])
+    ax_osa_ahi_4per = fig.add_subplot(gs[1, 1])
+
+    # insomnia
+    sns.boxplot(data=df_melted,
+                y='score_value',
+                x='insomnia',
+                hue='score_type',
+                palette=palette,
+                ax=ax_insomnia)
+    ax_insomnia.set_title(f'SSS & ESS Score by Insomnia\nSamples {pd.isna(df_melted.insomnia).sum()}')
+    ax_insomnia.set_xlabel(xlabel='Insomnia Diagnosis')
+    ax_insomnia.set_ylabel(ylabel='Sleep Questionnaire\nScore', rotation=90)
+    ax_insomnia.set_xticklabels(
+        [mapper_diagnosis.get('insomnia')[int(float(tick.get_text()))] for tick in ax_insomnia.get_xticklabels()])
+    ax_insomnia.grid(axis='y', alpha=0.7)
+
+    sns.boxplot(data=df_melted,
+                y='score_value',
+                x='narc_level',
+                hue='score_type',
+                palette=palette,
+                ax=ax_narc)
+    ax_narc.set_title(f'SSS & ESS Score by Narcolepsy\nSamples {pd.isna(df_melted.narc_level).sum()}')
+    ax_narc.set_xlabel(xlabel='Narcolepsy Diagnosis')
+    ax_narc.set_ylabel(ylabel='')
+    narc_levels_inv = {val:key for key, val in mapper_diagnosis.get('narc_level').items()}
+    ax_narc.set_xticklabels(
+        [narc_levels_inv[int(float(tick.get_text()))] for tick in ax_narc.get_xticklabels()])
+    ax_narc.grid(axis='y', alpha=0.7)
+
+    sns.boxplot(data=df_melted,
+                y='score_value',
+                x='osa_level_ahi_3per',
+                hue='score_type',
+                palette=palette,
+                ax=ax_osa_ahi_3per)
+    ax_osa_ahi_3per.set_title(f'SSS & ESS Score by OSA AHI 3%\nSamples {pd.isna(df_melted.osa_level_ahi_3per).sum()}')
+    ax_osa_ahi_3per.set_xlabel(xlabel='OSA Levels')
+    ax_osa_ahi_3per.set_ylabel(ylabel='Sleep Questionnaire\nScore')
+    ax_osa_ahi_3per.set_xticklabels(
+        [mapper_diagnosis.get('osa_levels')[int(float(tick.get_text()))] for tick in ax_osa_ahi_3per.get_xticklabels()])
+    ax_osa_ahi_3per.grid(axis='y', alpha=0.7)
+
+    sns.boxplot(data=df_melted,
+                y='score_value',
+                x='osa_level_ahi_4per',
+                hue='score_type',
+                palette=palette,
+                ax=ax_osa_ahi_4per)
+    ax_osa_ahi_4per.set_title(f'SSS & ESS Score by OSA AHI 4%\nSamples {pd.isna(df_melted.osa_level_ahi_4per).sum()}')
+    ax_osa_ahi_4per.set_xlabel(xlabel='OSA Levels')
+    ax_osa_ahi_4per.set_ylabel(ylabel='')
+    ax_osa_ahi_4per.set_xticklabels(
+        [mapper_diagnosis.get('osa_levels')[int(float(tick.get_text()))] for tick in ax_osa_ahi_4per.get_xticklabels()])
+    ax_osa_ahi_4per.grid(axis='y', alpha=0.7)
+
+    # Add a legend from one of the plots to the entire figure
+    handles, labels = ax_insomnia.get_legend_handles_labels()
+    fig.legend(handles, labels, loc='upper center', ncol=2, title='Score Type')
+
+    # Remove individual legends
+    ax_insomnia.legend_.remove()
+    ax_narc.legend_.remove()
+    ax_osa_ahi_3per.legend_.remove()
+    ax_osa_ahi_4per.legend_.remove()
+
+    plt.tight_layout()
+    plt.savefig(config.get('results_path').joinpath('Distribution_boxplot_scores_diagnosis.png'), dpi=300)
+    plt.show()
+
+
+    # %% 3. Comparing the responses
     # get the y ticks for the ess and sss
     ess_levels = {v: k for k, v in ess_quest.levels.items()}
     ess_levels[4] = ''
@@ -328,28 +458,64 @@ if __name__ == '__main__':
                                 n_components=2,
                                 file_name='two_components',
                                 plot=False)
+    # dataframe from poster where we place the desired labels
+    df_loadings.reset_index(inplace=True, drop=False, names=['question'])
+
+    questionnaire_lbls = sss_labels.copy()
+    questionnaire_lbls.update(ess_labels)
+    df_loadings.index = df_loadings['question'].map(questionnaire_lbls)
+
     # Biplot
-    plt.figure(figsize=(16, 10))
-    sns.scatterplot(x='PC_0', y='PC_1', data=df_loadings)
-    for i, txt in enumerate(df_loadings.index):
+    plt.figure(figsize=(16, 18))
+    # sns.scatterplot(x='PC_0', y='PC_1', data=df_loadings)
+    for idx, txt in zip(df_loadings.index, df_loadings.question):
         if 'score' in txt:
             color_vector = 'red'
         elif 'sss' in txt:
             color_vector = 'orange'
         else:
             color_vector = 'green'
-        plt.arrow(0, 0, df_loadings.iloc[i, 0], df_loadings.iloc[i, 1], color=color_vector, alpha=0.5)
-        plt.text(df_loadings.iloc[i, 0] * 1.2, df_loadings.iloc[i, 1] * 1.2, txt, color=color_vector, ha='center', va='center')
-
+        plt.arrow(x=0, y=0,
+                  dx=df_loadings.at[idx, 'PC_0'], dy=df_loadings.at[idx, 'PC_1'],
+                  color=color_vector,
+                  alpha=0.5,
+                  head_width=0.02, head_length=0.02, length_includes_head=False
+                  )
+        plt.text(x=df_loadings.at[idx, 'PC_0'] * 1.1,
+                 y=df_loadings.at[idx, 'PC_1'] * 1.1,
+                 s=idx,
+                 color=color_vector,
+                 ha='center',
+                 va='center',
+                 fontsize=13
+                 )
+    # for i, txt in enumerate(df_loadings.index):
+    #     if 'score' in txt:
+    #         color_vector = 'red'
+    #     elif 'sss' in txt:
+    #         color_vector = 'orange'
+    #     else:
+    #         color_vector = 'green'
+    #     plt.arrow(0, 0, df_loadings.iloc[i, 0], df_loadings.iloc[i, 1], color=color_vector, alpha=0.5)
+    #     plt.text(x=df_loadings.iloc[i, 0] * 1.2,
+    #              y=df_loadings.iloc[i, 1] * 1.2,
+    #              s=txt,
+    #              color=color_vector,
+    #              ha='center',
+    #              va='center',
+    #              # fontsize=11
+    #              )
     circle = plt.Circle((0, 0), 1, color='b', fill=False, linestyle='--')
     plt.gca().add_artist(circle)
     plt.gca().set_aspect('equal', adjustable='datalim')
     plt.title('Factor Loadings ESS & SSS')
     plt.xlabel('Principal Component 0')
     plt.ylabel('Principal Component 1')
-    plt.grid()
+    plt.xlim([-0.25, 1.30])
+    plt.ylim([-1, 1])
+    plt.grid(alpha=0.4, axis='both')
     plt.tight_layout()
-    plt.savefig(config.get('results_path').joinpath('PCA_Biplot.png'), dpi=300)
+    plt.savefig(config.get('results_path').joinpath('PCA_Biplot_Lables.png'), dpi=300)
     plt.show()
 
 
@@ -470,3 +636,14 @@ if __name__ == '__main__':
     fig.suptitle(t='PCA Projections', fontsize=20, y=0.92)
     plt.savefig(config.get('results_path').joinpath('PCA_Projection_Kmeans_3Clusters.png'), dpi=300)
     plt.show()
+
+
+    # TODO: new regression plot where we mark the high narc, osa and insomnia cases, so it can show the the
+    #  questionnaire
+
+    # TODO: color code diagnosis
+    #     - red: narc
+    #     - blue: apnea, osa level
+    #     - pinc: insomnia
+    #     - controld: black
+    # TODO: change the size of the dots, increase the alpha, border thicker

@@ -207,3 +207,7 @@ if __name__ == '__main__':
                    columns=col_ess,
                    title_global='Responses Situational Sleep Scale')
 
+
+    # TODO  table mean of diagnosis for ahi, insomrnia, rls, narcolepsy
+
+

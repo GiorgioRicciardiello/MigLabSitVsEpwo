@@ -2,12 +2,13 @@ import pathlib
 import pandas as pd
 import statsmodels.api as sm
 import numpy as np
-from config.config import config, mapper
+from config.config import config, mapper, mapper_diagnosis
 import matplotlib.pyplot as plt
 from scipy.stats import mannwhitneyu
 import seaborn as sns
 from questionnaires.questionnaires import SituationalSleepinessScale
 import re
+from utils.functions import osa_categories
 
 def natural_sort_key(s, _nsre=re.compile('([0-9]+)')):
     """sort the ESS and SSS columns based on the last integer ant not the  lexicographically order"""
@@ -117,6 +118,44 @@ if __name__ == '__main__':
     sss_score = [score for score in col_sss if 'score' in score]
     df_raw[sss_score[0]] = sit_quest.compute_score(responses=df_raw[col_sss])
     df_raw[sss_score[1]] = df_raw[sss_score[0]]/10
+    # %% clean the diagnosis columns with strings
+    col_diagnosis = ['insomnia', 'narc_level', 'rls', 'rmeq']
+    df_raw['insomnia'].unique()
+    mapping_insomnia = {'yes': 1, 'no': 0, 1: 1, 0: 0}
+    df_raw['insomnia'] = df_raw['insomnia'].map(mapping_insomnia)
+
+    df_raw['narc_level'].unique()
+    mapping_narc_level = {'1 or 3': '1-3',
+                          '2 or 3': '2-3',
+                          0: 0,
+                          1: 1,
+                          2: 2,
+                          3: 3,}
+    df_raw['narc_level'] = df_raw['narc_level'].map(mapping_narc_level)
+    # set them all as numeric
+    df_raw['narc_level'] = df_raw['narc_level'].map(mapper_diagnosis.get('narc_level'))
+
+    df_raw['rls'].unique()
+    mapping_rls = {'yes': 1,
+                   'no': 0,
+                   1: 1,
+                   0: 0}
+    df_raw['rls'] = df_raw['rls'].map(mapping_rls)
+
+    df_raw['rmeq'].unique()
+    mapping_rls = {'yes': 1,
+                   'no': 0,
+                   1: 1,
+                   0: 0}
+    df_raw['rls'] = df_raw['rls'].map(mapping_rls)
+
+    df_raw['osa_level_ahi_3per'] = df_raw['ahi_3per'].map(osa_categories)
+    df_raw['osa_level_ahi_4per'] = df_raw['ahi_4per'].apply(osa_categories)
+
+    df_raw['osa_level_odi_3per'] = df_raw['odi_3per'].map(osa_categories)
+    df_raw['osa_level_odi_4per'] = df_raw['odi_4per'].apply(osa_categories)
+
+
     # %% sort the questionnaire columns
     df_raw.reset_index(inplace=True, drop=True)
     df_raw = sort_columns(df=df_raw)

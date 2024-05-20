@@ -3,6 +3,11 @@ Configuration file of the project
 
 """
 import pathlib
+from typing import Union
+
+import numpy as np
+import pandas as pd
+
 #%% define the directories
 # Define root path
 root_path = pathlib.Path(__file__).resolve().parents[1]
@@ -67,14 +72,25 @@ mapper = {
 }
 
 
-
-
-
-
-
-
-
-
+# mapping of the diagnosis
+mapper_diagnosis = {
+    'narc_level': {
+        0:0,
+        1:1,
+        2:2,
+        3:3,
+        '1-3':4,
+        '2-3':5,
+    },
+    'osa_levels': {0: 'Normal',
+                   1: 'Mild',
+                   2: 'Moderate',
+                   3: 'Severe'},
+    'insomnia': {
+        1:'yes',
+        0:'no'
+    }
+}
 
 
 
