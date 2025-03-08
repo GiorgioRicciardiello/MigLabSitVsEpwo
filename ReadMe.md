@@ -32,7 +32,10 @@ Cronbach's alpha is a measure of internal consistency or reliability of a set of
 
 ## Explanation File Structure 
 The src folder contains the course code of the: 
-1. pre-processing (pre_process.py)
+1. pre-processing pipeline:
+   - pre_process_first_cross_sectional.py
+   - pre_process_second_cross_sectional.py
+   - pre_process_merge_cross_sectional.py
 2. Correlation and PCA analysis (statistical_analysis.py)
 3. Factorial Analysis (subject_daytime_analysis.py)
 4. Table creation to present the demographics and responses (table_dem_questions.py)

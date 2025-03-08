@@ -12,18 +12,24 @@ import pandas as pd
 # Define root path
 root_path = pathlib.Path(__file__).resolve().parents[1]
 # Define raw data path
-data_raw_path = root_path.joinpath('data', 'rawdata', 'SSS_data_download_18Apr2024.xlsx')
+data_raw_path = root_path.joinpath('data', 'rawdata')
 # Define pre-processed data path
-data_pre_proc_path = root_path.joinpath('data', 'ppdata', 'pp_data.csv')
+data_pre_proc_path = root_path.joinpath('data', 'ppdata')
 # Define results path
 results_path = root_path.joinpath('results')
 
 config = {
     'root_path': root_path,
-    'data_raw_path': data_raw_path,
-    'data_pp_path': data_pre_proc_path,
+    'data_raw_path': {
+        'first_cross_sectional': data_raw_path.joinpath('SSS_data_18Apr2024.xlsx'),
+        'second_cross_sectional': data_raw_path.joinpath('SSS_data_14Feb2025.xlsx'),
+    },
+    'data_pp_path': {
+        'first_cross_sectional': data_pre_proc_path.joinpath('first_cross_sectional.csv'),
+        'second_cross_sectional': data_pre_proc_path.joinpath('second_cross_sectional.csv'),
+        'pp_data': data_pre_proc_path.joinpath('pp_data.csv'),
+    },
     'results_path': results_path,
-
 }
 
 mapper = {
@@ -46,16 +52,17 @@ mapper = {
         'Record ID': 'record_id',
         'Survey Timestamp': 'date',
         'Date of Birth': 'dob',
-        'Sex': 'gender',
+        'gender': 'gender',
         'SSS10-30mina': 'sss10_30min',
         'SSS10-15mins': 'sss10_15min',
         'Score SSS': 'sss_score',
-        'SSS divided by #questions answered': 'sss_scores_div_num_quest',
+        'SSS divided by #questions answered': 'sss_score_div_num_quest',
         'ESS total': 'ess_score',
         'ESS Divided': 'ess_score_div_num_quest',
         'BMI': 'bmi',
         'OSA 1-Mild, 2-Moderate, 3-Severe)': 'osa_level',
         'Narcolepsy (1- NT1, 2-NT2, 3-IH)': 'narc_level',
+        'electronic_consent_form_timestamp': 'date_consent',
         'RLS': 'rls',
         'Insomnia': 'insomnia',
         'AHI 3%': 'ahi_3per',
@@ -76,11 +83,11 @@ mapper = {
 mapper_diagnosis = {
     'narc_level': {
         0:0,
-        1:1,
-        2:2,
-        3:3,
-        '1-3':4,
-        '2-3':5,
+        1:1,    # Narcolepsy with cataplexy
+        2:2,    # Narcolepsy without cataplexy
+        3:3,    # Idiopathic hypersomnia
+        '1-3':4,    # unclear from char
+        '2-3':5,    # unclear from char
     },
     'osa_levels': {0: 'Normal',
                    1: 'Mild',
