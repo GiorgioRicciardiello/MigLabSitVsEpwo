@@ -2,6 +2,7 @@
 Definition of the sleep scale questionnaire to be used in the study
 """
 import pandas as pd
+from typing import Dict
 
 class SituationalSleepinessScale:
     """
@@ -55,6 +56,20 @@ class SituationalSleepinessScale:
                 'label': 'SSS Score ',
                 'levels': [1,2,3,4,5,6,7,8,9,10,11 ]}
         }
+        self.latent_factor = {
+            'sss1': 'general',  # general likelihood of dozing off
+            'sss2': 'active',  # working on a computer – requires attention
+            'sss3': 'active',  # talking on the phone – interaction involved
+            'sss4': 'passive',  # in a meeting – likely sitting and listening
+            'sss5': 'passive',  # lecture/church – mostly listening
+            'sss6': 'active',  # playing a game with others – interactive
+            'sss7': 'active',  # driving – highly active and alert
+            'sss8': 'active',  # videogames – engaging and interactive
+            'sss9': 'passive',  # lying down – minimal engagement
+            'sss10': 'passive',  # traveling as passenger – sedentary and passive
+            'sss11': 'passive',  # watching a film – relaxed, seated
+            'sss_score': 'computed'  # summary score, not a state
+        }
 
     def compute_score(self,
                       responses: pd.DataFrame) -> pd.Series:
@@ -89,8 +104,8 @@ class SituationalSleepinessScale:
             'sss11': 'Watching\nmovie',
             'sss_score': 'SSS Score',
         }
-
-    pass
+    def get_latent_factor(self) -> Dict[str, str]:
+        return self.latent_factor
 
 
 class EpworthScale:
@@ -123,6 +138,18 @@ class EpworthScale:
                      'levels': [*self.levels.keys()]}
         }
 
+        self.latent_factor = {
+            'ess1': 'passive',  # Sitting/reading – low stimulation
+            'ess2': 'passive',  # Watching TV – passive entertainment
+            'ess3': 'passive',  # Sitting inactive in public – minimal stimulation
+            'ess4': 'passive',  # Car passenger – no activity required
+            'ess5': 'passive',  # Lying down – extremely low engagement
+            'ess6': 'active',  # Talking to someone – interactive
+            'ess7': 'passive',  # Sitting after lunch – digestion + rest = low alertness
+            'ess8': 'active',  # Car in traffic while stopped – attentional demand (even as driver)
+            'ess_score': 'computed',
+        }
+
     def compute_score(self, responses: pd.DataFrame) -> pd.Series:
         """Compute the Epworth Sleepiness Scale (ESS) Score"""
         question = [quest for quest in list(self.questionnaire.keys()) if quest not in ['ess_score']]
@@ -146,3 +173,5 @@ class EpworthScale:
             'ess8': 'Car in\ntraffic',
             'ess_score': 'ESS Score',
         }
+    def get_latent_factor(self) -> Dict[str, str]:
+        return self.latent_factor

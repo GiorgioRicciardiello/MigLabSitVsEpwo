@@ -27,6 +27,7 @@ config = {
     'data_pp_path': {
         'first_cross_sectional': data_pre_proc_path.joinpath('first_cross_sectional.csv'),
         'second_cross_sectional': data_pre_proc_path.joinpath('second_cross_sectional.csv'),
+        'asq_data': data_pre_proc_path.joinpath('asq_data.csv'),
         'pp_data': data_pre_proc_path.joinpath('pp_data.csv'),
     },
     'results_path': results_path,
@@ -74,7 +75,7 @@ mapper = {
         'Sleep latency (min)': 'sleep_lat_min',
         'Sleep Efficiency (%)': 'sleep_eff_perc',
         'PLMI': 'plmi',
-        'rMEQ': 'rmeq'
+        'rMEQ': 'rmeq',
     },
 }
 

@@ -26,7 +26,7 @@ sns.set_context('poster')
 
 
 if __name__ == '__main__':
-    df_data = pd.read_csv(config.get('data_pp_path'))
+    df_data = pd.read_csv(config.get('data_pp_path').get('pp_data'))
     col_sss = [col for col in df_data.columns if 'sss' in col and ' ' not in col and len(col) < 10]
 
     col_ess = [col for col in df_data.columns if 'ess' in col and len(col) < 10]
@@ -41,6 +41,10 @@ if __name__ == '__main__':
     df_data.reset_index(drop=True, inplace=True)
     questions_score = col_ess + col_sss
     cmp_heatmap = sns.color_palette("Spectral_r", as_cmap=True)
+
+    output_path = config.get('results_path').joinpath('pca_kmeans')
+    if not output_path.exists():
+        output_path.mkdir(exist_ok=True, parents=True)
 
     # %% define the questionnaire classes
     ess_quest = EpworthScale()
@@ -59,6 +63,7 @@ if __name__ == '__main__':
                                        index=range(0, questions_scaled.shape[0]))
     # Apply PCA
     # Explore all the factors to determine number of components
+    # Factor Loadings: How well do the questions align with underlying constructs?
     pca_interpretation(frame=df_data,
                        columns=questions_score,
                        figsize=(12, 12),
@@ -102,22 +107,6 @@ if __name__ == '__main__':
                  va='center',
                  fontsize=13
                  )
-    # for i, txt in enumerate(df_loadings.index):
-    #     if 'score' in txt:
-    #         color_vector = 'red'
-    #     elif 'sss' in txt:
-    #         color_vector = 'orange'
-    #     else:
-    #         color_vector = 'green'
-    #     plt.arrow(0, 0, df_loadings.iloc[i, 0], df_loadings.iloc[i, 1], color=color_vector, alpha=0.5)
-    #     plt.text(x=df_loadings.iloc[i, 0] * 1.2,
-    #              y=df_loadings.iloc[i, 1] * 1.2,
-    #              s=txt,
-    #              color=color_vector,
-    #              ha='center',
-    #              va='center',
-    #              # fontsize=11
-    #              )
     circle = plt.Circle((0, 0), 1, color='b', fill=False, linestyle='--')
     plt.gca().add_artist(circle)
     plt.gca().set_aspect('equal', adjustable='datalim')
@@ -128,7 +117,7 @@ if __name__ == '__main__':
     plt.ylim([-1, 1])
     plt.grid(alpha=0.4, axis='both')
     plt.tight_layout()
-    plt.savefig(config.get('results_path').joinpath('PCA_Biplot_Lables.png'), dpi=300)
+    # plt.savefig(config.get('results_path').joinpath('PCA_Biplot_Lables.png'), dpi=300)
     plt.show()
 
     # %% PCA on each questionnaire to see how they are clustered
@@ -160,7 +149,7 @@ if __name__ == '__main__':
                 ax=ax1)
     ax1.set_title('ESS Loadings')
 
-    sns.heatmap(df_loadings,
+    sns.heatmap(df_loadings[['PC_0', 'PC_1']],
                 annot=True,
                 fmt=".2f",
                 cmap=cmp_heatmap,
@@ -176,12 +165,13 @@ if __name__ == '__main__':
     ax4.set_title('SSS Loadings')
     plt.subplots_adjust(wspace=0.4)
     fig.suptitle(f'Factor Loadings When PCA Applied Separately and Both Questionnaires')
-    plt.savefig(config.get('results_path').joinpath('PCA_Loading_HeatMap_ThreeSubPlots.png'), dpi=300)
+    # plt.savefig(config.get('results_path').joinpath('PCA_Loading_HeatMap_ThreeSubPlots.png'), dpi=300)
     plt.show()
 
     # scatter plot of the pca
 
-    # %%  K-means Clustering on the PCA components
+    # %% K-means Clustering on the PCA components
+    # Clustering: Are there meaningful subgroups in the data based on responses?
     # PCA using all the questions
     kmeans_all = KMeans(n_clusters=3)  # Adjust the number of clusters as needed
     clusters = kmeans_all.fit_predict(df_pca)
@@ -247,4 +237,46 @@ if __name__ == '__main__':
     fig.suptitle(t='PCA Projections', fontsize=20, y=0.92)
     plt.savefig(config.get('results_path').joinpath('PCA_Projection_Kmeans_3Clusters.png'), dpi=300)
     plt.show()
+
+    # Cluster Validation Metrics
+    from sklearn.metrics import silhouette_score
+    silhouette = silhouette_score(df_pca, clusters)
+    print(f"Silhouette Score: {silhouette}")
+    # elbow method
+    inertias = []
+    for k in range(1, 10):
+        kmeans = KMeans(n_clusters=k, random_state=42).fit(df_pca)
+        inertias.append(kmeans.inertia_)
+    plt.plot(range(1, 10), inertias, 'bx-')
+    plt.xlabel('k')
+    plt.ylabel('Inertia')
+    plt.tight_layout()
+    plt.show()
+
+    # Cumulative Variance Explained
+    pca = PCA().fit(questions_scaled)
+    explained_variance = np.cumsum(pca.explained_variance_ratio_)
+    plt.plot(explained_variance)
+    plt.xlabel('Number of Components')
+    plt.ylabel('Cumulative Explained Variance')
+    plt.tight_layout()
+    plt.show()
+    # Loadings Interpretation: Quantify which questions dominate each PC (e.g., threshold > 0.3
+    significant_loadings = df_loadings[abs(df_loadings) > 0.3]
+    print(significant_loadings.dropna(how='all'))
+    # statistical test (e.g., cosine similarity) to quantify similarity:
+    from sklearn.metrics.pairwise import cosine_similarity
+    sim_ess_sss = cosine_similarity(df_loadings_ess.T, df_loadings_sss.T)
+    print(f"Cosine Similarity between ESS and SSS Loadings: {sim_ess_sss}")
+
+
+    # %% Item Response Theory (IRT)
+    # IRT models the relationship between individual responses and latent traits (e.g., sleepiness) for ordinal data, offering insights into item difficulty and discrimination.
+    from mirt import GradedResponseModel  # Hypothetical; use R's mirt or similar
+
+    model = GradedResponseModel(df_questions)
+    model.fit()
+    print(model.item_parameters)
+
+
 

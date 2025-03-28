@@ -21,6 +21,15 @@ def sort_columns(df: pd.DataFrame) -> pd.DataFrame:
     df = df.loc[:, ~df.columns.duplicated()]
     return df
 
+def mapping_sss10(row) -> int:
+    if pd.isna(row['sss10_30min']):
+        if pd.notna(row['sss10_15min']) and 0 < row['sss10_15min'] < 3:
+            return row['sss10_15min'] + 1
+        else:
+            return row['sss10_15min']
+    else:
+        return row['sss10_30min']
+
 
 if __name__ == '__main__':
     # %% rename columns
@@ -32,6 +41,17 @@ if __name__ == '__main__':
     df_raw.columns = map(str.lower, df_raw.columns)
     mapper_columns = {key: val for key, val in mapper_columns.items() if val in df_raw.columns}
 
+    # %% get PHI data to match later with the ASQ
+    df_phi = pd.read_excel(config.get('data_raw_path').get('first_cross_sectional'),
+                           sheet_name='RawData1')
+    df_phi['First Name'] = df_phi['First Name'].astype(str).str.strip()
+    df_raw['Last Name'] = df_phi['Last Name'].astype(str).str.strip()
+    df_phi['full_name'] = df_phi['First Name'] + ' ' + df_phi['Last Name']
+
+    df_phi.columns = map(str.strip, df_phi.columns)
+    df_phi.rename(columns=mapper_columns, inplace=True)
+    df_phi['dob'] = pd.to_datetime(df_phi['dob'])
+    df_phi = df_phi[['study_id','record_id', 'full_name','dob']]
     # %% select columns of interest and remove nans rows
     col_extra = ['race', 'ethnicity']
     col_sss = [col for col in df_raw.columns if 'sss' in col and ' ' not in col]
@@ -56,10 +76,12 @@ if __name__ == '__main__':
     df_raw['age'] = df_raw['date'].dt.year - df_raw['dob'].dt.year
     # bmi
     df_raw['bmi'] = pd.to_numeric(df_raw['bmi'], errors='coerce')
+    # gender
+    most_common_gender = df_raw['gender'].mode()[0]
+    df_raw['gender'] = df_raw['gender'].fillna(most_common_gender)
     # %%
     df_raw.sort_values(by='study_id', inplace=True)
-    df_raw.drop(columns=['record_id'],
-                inplace=True)
+
     df_raw.replace('.', np.nan, inplace=True)
     # sort columns alphabetically
     df_raw = sort_columns(df=df_raw)
@@ -71,17 +93,6 @@ if __name__ == '__main__':
     df_raw.loc[df_raw['sss10_30min'].isna(), 'sss_30_min_derived'] = df_raw['sss10_15min']*ratio_sss10
     df_raw['sss_30_min_derived'] = df_raw['sss_30_min_derived'].round(1)
     # df_raw[['sss_30_min_derived', 'sss10_30min', 'sss10_15min']]
-
-
-    def mapping_sss10(row) -> int:
-        if pd.isna(row['sss10_30min']):
-            if pd.notna(row['sss10_15min']) and 0 < row['sss10_15min'] < 3:
-                return row['sss10_15min'] + 1
-            else:
-                return row['sss10_15min']
-        else:
-            return row['sss10_30min']
-
 
     # Apply the mapping function to create a new column 'sss10_2'
     df_raw['sss10'] = df_raw.apply(mapping_sss10, axis=1)
@@ -170,6 +181,35 @@ if __name__ == '__main__':
     df_raw['osa_level_odi_3per'] = df_raw['odi_3per'].map(osa_categories)
     df_raw['osa_level_odi_4per'] = df_raw['odi_4per'].apply(osa_categories)
 
+    # %% Combine rar data with phi data
+    # raw data has a cleaned version, so we want only the records on right
+    df_data = pd.merge(left=df_phi,
+                       right=df_raw,
+                       how='right',
+                       on=['study_id', 'record_id'],
+                       suffixes=("_phi", "_raw"))
+    # Remove duplicate columns by keeping only one (preferably from df_raw)
+    cleaned_columns = {}
+    for col in df_data.columns:
+        if col.endswith('_phi') or col.endswith('_raw'):
+            base = col.rsplit('_', 1)[0]
+            if base not in cleaned_columns:
+                cleaned_columns[base] = col
+        else:
+            cleaned_columns[col] = col
+
+    # Keep only one version of duplicated columns
+    df_data = df_data[[v for v in cleaned_columns.values()]]
+    df_data.columns = [k for k in cleaned_columns.keys()]
+
+    assert df_data.shape[0] == df_raw.shape[0]
+
+    df_data['full_name'] = df_data.apply(
+        lambda row: row['full_name'] if pd.notna(row['full_name']) else f"no_name_{row['study_id']}",
+        axis=1
+    )
+    df_data['full_name'] = df_data.full_name.str.lower()
+
 
     # %% sort the questionnaire columns
     # df_raw.reset_index(inplace=True, drop=True)
@@ -186,5 +226,5 @@ if __name__ == '__main__':
     # # aggregate the organized questionnaires
     # df_raw = pd.concat([df_raw, df_ess, df_sss], axis=1)
     # %% save
-    df_raw.to_csv(config.get('data_pp_path').get('first_cross_sectional'),
+    df_data.to_csv(config.get('data_pp_path').get('first_cross_sectional'),
                   index=False)

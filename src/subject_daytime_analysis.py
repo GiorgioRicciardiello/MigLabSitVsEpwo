@@ -43,7 +43,7 @@ def cronbach_alpha(df):
     return alpha
 
 if __name__ == '__main__':
-    df_data = pd.read_csv(config.get('data_pp_path'))
+    df_data = pd.read_csv(config.get('data_pp_path').get('pp_data'))
     col_sss = [col for col in df_data.columns if 'sss' in col and ' ' not in col and len(col) < 10]
 
     col_ess = [col for col in df_data.columns if 'ess' in col and len(col) < 10]
@@ -113,23 +113,24 @@ if __name__ == '__main__':
     # Add factor scores to the original DataFrame
     df = pd.concat([df_data, factor_df], axis=1)
 
+
     # Regression analysis
     # Model Factor 1
     model1 = smf.ols(
-        'Factor1 ~ age + gender + bmi + race + ethnicity',
-        data=df).fit()
+        'Factor1 ~ age + C(gender, Treatment(0)) + bmi + C(race, Treatment(0))',
+        data=df).fit().get_robustcov_results(cov_type='HC0')
     print(model1.summary())
 
     # Model Factor 2
     model2 = smf.ols(
-        'Factor2 ~ age + gender + bmi + race + ethnicity',
-        data=df).fit()
+        'Factor2 ~ age + C(gender, Treatment(0)) + bmi + C(race, Treatment(0))',
+        data=df).fit().get_robustcov_results(cov_type='HC0')
     print(model2.summary())
 
     # Model Factor 3
     model3 = smf.ols(
-        'Factor3 ~ age + gender + bmi + race + ethnicity',
-        data=df).fit()
+        'Factor3 ~ age + C(gender, Treatment(0)) + bmi + C(race, Treatment(0))',
+        data=df).fit().get_robustcov_results(cov_type='HC0')
     print(model3.summary())
 
     path_m1 = config.get('results_path').joinpath('FA_fa1_ols_summary.txt')
@@ -143,6 +144,7 @@ if __name__ == '__main__':
     path_m3 = config.get('results_path').joinpath('FA_fa3_ols_summary.txt')
     with open(path_m3, "w") as f:
         f.write(model3.summary().as_text())
+
     # %% Plots
     plt.figure(figsize=(12, 10))  # You can adjust the size as needed
     cbar_kws = {'label': 'Correlation coefficient', 'ticks': 10}

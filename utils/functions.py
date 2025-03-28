@@ -45,6 +45,7 @@ def pca_interpretation(frame: pd.DataFrame,
 
     # Standardize the data
     scaler = StandardScaler()
+    questions_scaled = scaler.fit_transform(frame)
     df_frame_scaled = pd.DataFrame(scaler.fit_transform(frame),
                                    columns=frame.columns,
                                    index=range(0, questions_scaled.shape[0]))

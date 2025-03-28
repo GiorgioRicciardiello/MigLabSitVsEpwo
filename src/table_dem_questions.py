@@ -117,16 +117,16 @@ if __name__ == '__main__':
     sit_quest = SituationalSleepinessScale()
     # %% make table 1
     # Re-map numeric columns to categorical labels
-    mapper_inv = {col: {v: k for k, v in mapper.get(col).items()} for col in ['gender', 'race', 'ethnicity']}
+    mapper_inv = {col: {v: k for k, v in mapper.get(col).items()} for col in ['gender', 'race']}
     for col in mapper_inv:
         df_data[col] = df_data[col].map(mapper_inv[col])
 
     index_gender = create_index(df_data, 'gender', 'Gender')
     index_race = create_index(df_data, 'race', 'Race')
-    index_ethnicity = create_index(df_data, 'ethnicity', 'Ethn')
+    # index_ethnicity = create_index(df_data, 'ethnicity', 'Ethn')
 
     # Combine indices
-    index = ['age', 'bmi'] + index_gender + index_race + index_ethnicity
+    index = ['age', 'bmi'] + index_gender + index_race #  + index_ethnicity
 
     # Initialize table
     tableone = pd.DataFrame(index=index, columns=['metric'])

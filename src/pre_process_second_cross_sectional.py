@@ -20,7 +20,8 @@ def natural_sort_key(s, _nsre=re.compile('([0-9]+)')):
     """sort the ESS and SSS columns based on the last integer ant not the  lexicographically order"""
     return [int(text) if text.isdigit() else text.lower() for text in re.split(_nsre, s)]
 def sort_columns(df: pd.DataFrame) -> pd.DataFrame:
-    leading_columns = ['study_id', 'age', 'bmi', 'gender', 'race', 'dob']
+    leading_columns = ['study_id', 'record_id', 'full_name', 'age', 'bmi', 'gender', 'race', 'dob']
+    leading_columns = [col for col in leading_columns if col in df.columns]
     other_columns = sorted([col for col in df.columns if col not in leading_columns])
     sorted_columns = leading_columns + other_columns
     df = df[sorted_columns]
@@ -34,6 +35,12 @@ if __name__ == '__main__':
                            sheet_name='split 2- raw')
     df_raw = df_raw.loc[df_raw['Duplicate'].isna()]
     df_raw.reset_index(inplace=True, drop=True)
+    df_raw['email'] = df_raw['email'].astype(str).str.strip().str.lower()
+    # Strip spaces from first and last names
+    df_raw['first name'] = df_raw['first name'].astype(str).str.strip()
+    df_raw['last name'] = df_raw['last name'].astype(str).str.strip()
+    df_raw['full_name'] = df_raw['first name'] + ' ' + df_raw['last name']
+
     mapper_columns = mapper.get('standardization')
     df_raw.columns = map(str.strip, df_raw.columns)
     df_raw.rename(columns=mapper_columns, inplace=True)
@@ -46,6 +53,60 @@ if __name__ == '__main__':
                      'sleep_eff_perc', 'plmi', 'rmeq', 'sleep study date']
     df_raw['narc_level'].value_counts()
 
+    # %% Generate Study ID for the records
+    # df_phi = df_raw[['record_id', 'full_name', 'dob', 'email']]
+    df_raw['full_name'] = df_raw.full_name.str.lower()
+    df_raw = sort_columns(df_raw)
+
+    df_raw['study_key'] = df_raw['full_name'].astype(str) + '_' + \
+                          df_raw['dob'].astype(str)
+                # df_phi['email'].astype(str) + '_' + \
+    df_raw['study_id'] = pd.factorize(df_raw['study_key'])[0] + 1  # Start IDs at 1
+    df_raw = df_raw.drop(columns='study_key')
+    repeated_names = df_raw[df_raw['full_name'].duplicated(keep=False)]
+
+    # %% Date
+    df_date = pd.read_excel(config.get('data_raw_path').get('second_cross_sectional'),
+                           sheet_name='split 1- NA removed')
+    df_date = df_date.loc[df_date['Study ID'].isin(df_raw.record_id.unique()), ['Study ID', 'Observation #']]
+    df_date.rename(columns={'Observation #': 'date'}, inplace=True)
+
+    df_raw = pd.merge(left=df_raw,
+                        right=df_date,
+                        left_on='record_id',
+                        right_on='Study ID',
+                        how='left')
+    df_raw.drop(columns='Study ID', inplace=True)
+    # %% PHI data for the ASQ merging
+    # df_phi = pd.read_excel(config.get('data_raw_path').get('second_cross_sectional'),
+    #                        sheet_name='Split 1 Study ID code')
+    # df_phi['email'] = df_phi['Best Email Address'].astype(str).str.strip().str.lower()
+    # # Strip spaces from first and last names
+    # df_phi['First Name'] = df_phi['First Name'].astype(str).str.strip()
+    # df_phi['Last Name'] = df_phi['Last Name'].astype(str).str.strip()
+    # df_phi = df_phi.loc[df_phi['First Name'] != 'nan', :]
+    #
+    # # Create full_name with a clean format
+    # df_phi['full_name'] = df_phi['First Name'] + ' ' + df_phi['Last Name']
+    # df_phi.columns = map(str.strip, df_phi.columns)
+    # df_phi.rename(columns=mapper_columns, inplace=True)
+    # # df_phi = df_phi[['study_id','record_id', 'full_name']]
+    # df_phi = df_phi.loc[~df_phi['full_name'].isna(), :]
+    #
+    # # assert df_phi.full_name.nunique() == df_phi.shape[0]
+    # # study id has not been assigned to the subjects in the dataset, we need to do it
+    # # Combine the fields into a single string per row
+    # df_phi['email'] = df_phi.email.str.lower()
+    # df_phi['study_key'] = df_phi['full_name'].astype(str) + '_' + \
+    #                       df_phi['email'].astype(str) + '_' + \
+    #                       df_phi['dob'].astype(str)
+    #
+    # # Convert that combination to a unique number using factorize (efficient and consistent)
+    # df_phi['study_id'] = pd.factorize(df_phi['study_key'])[0] + 1  # Start IDs at 1
+    # df_phi = df_phi.drop(columns='study_key')
+    #
+    # # df_phi = sort_columns(df_phi)
+    # df_phi = df_phi[['study_id', 'record_id', 'full_name' ]]
     # # df_duplicates = df_raw[
     # #     df_raw.apply(lambda row: row.astype(str).str.contains('Duplicate', case=False, na=False).any(), axis=1)]
     # mask_duplicates = df_raw.apply(lambda row: row.astype(str).str.contains('Duplicate', case=False, na=False).any(), axis=0)
@@ -61,7 +122,7 @@ if __name__ == '__main__':
     col_race = [col for col in df_raw.columns if 'race__' in col and ' ' not in col]
     col_sss = [col for col in df_raw.columns if 'sss' in col and ' ' not in col]
     col_ess = [col for col in df_raw.columns if 'ess' in col and len(col) < 10]
-    col_interest = [*mapper_columns.values()] + col_race + col_sss + col_ess + col_diagnosis
+    col_interest = [*mapper_columns.values()] + col_race + col_sss + col_ess + col_diagnosis + ['full_name']
     col_interest = sorted(set(col_interest))
     df_raw = df_raw[col_interest]
     df_raw.replace('.',  np.nan, inplace=True)
@@ -86,14 +147,16 @@ if __name__ == '__main__':
     df_raw['age'] = df_raw['date_consent'].dt.year - df_raw['dob'].dt.year
     # bmi
     df_raw['bmi'] = pd.to_numeric(df_raw['bmi'], errors='coerce')
+
+    df_raw['gender'] = df_raw['gender'].map({1: 1, 2: 0})
     # %%
-    df_raw['study_id'] = df_raw['record_id']
+    # df_raw['study_id'] = df_raw['record_id']
     df_raw.sort_values(by='study_id', inplace=True)
     df_raw.replace('.', np.nan, inplace=True)
     # sort columns alphabetically
     df_raw = sort_columns(df=df_raw)
-    df_raw.drop(columns=['record_id', 'dob'],
-                inplace=True)
+    # df_raw.drop(columns=['record_id', 'dob'],
+    #             inplace=True)
     # %% compute SS10
     df_raw.rename(columns={'sss10_30min': 'sss10'}, inplace=True)
     df_raw.drop(columns=['sss10_15min'],
@@ -139,6 +202,7 @@ if __name__ == '__main__':
     # df_sss = df_raw[sorted_col_sss].copy()
     df_raw['sss_score_div_num_quest'] = df_raw['sss_score']/10
     # drop from original the non-organized version
+
     # %% save
     df_raw.to_csv(config.get('data_pp_path').get('second_cross_sectional'),
                   index=False)
