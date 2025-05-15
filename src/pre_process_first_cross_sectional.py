@@ -33,8 +33,12 @@ def mapping_sss10(row) -> int:
 
 if __name__ == '__main__':
     # %% rename columns
-    df_raw = pd.read_excel(config.get('data_raw_path').get('first_cross_sectional'),
-                           sheet_name='PpData2')
+    # df_raw = pd.read_excel(config.get('data_raw_path').get('first_cross_sectional'),
+    #                        sheet_name='PpData2')
+
+    df_raw = pd.read_excel(config.get('data_raw_path').get('both_cross_sectional'),
+                           sheet_name='april 2024')
+
     mapper_columns = mapper.get('standardization')
     df_raw.columns = map(str.strip, df_raw.columns)
     df_raw.rename(columns=mapper_columns, inplace=True)
@@ -58,6 +62,7 @@ if __name__ == '__main__':
     col_ess = [col for col in df_raw.columns if 'ess' in col and len(col) < 10]
     col_interest = [*mapper_columns.values()] + col_sss + col_ess + col_extra
     df_raw = df_raw[col_interest]
+    df_raw.replace('.',  np.nan, inplace=True)
     df_raw.dropna(how='all', inplace=True)
     df_raw.dropna(subset=['study_id'], inplace=True)
     df_raw[col_ess] = df_raw[col_ess].astype(int)
@@ -133,14 +138,26 @@ if __name__ == '__main__':
 
     # %% SSS replace nan with not applicable
     col_sss = [col for col in df_raw.columns if 'sss' in col and ' ' not in col]
-    df_raw[col_sss] = df_raw[col_sss].fillna(value=4,)
+    df_subset = df_raw[col_sss]
+    nan_per_column = df_subset.isna().sum()
+    subjects_with_nan = df_subset.isna().astype(int)
+    # df_subset.loc[df_subset.isna().sum(1) > 0, :]
+    print(f'Total subjects with any nan {df_subset.loc[df_subset.isna().sum(1) > 0, :].shape[0]} of {df_raw.shape[0]}')
+    summary_df = pd.DataFrame({
+        'Column': nan_per_column.index,
+        'Number of NaNs': nan_per_column.values,
+        'Subjects with NaNs': subjects_with_nan.astype(bool).sum(axis=0).values
+    }).set_index('Column')
+    print(f'Summary of NaNs per column\n{summary_df}')
+
+    # df_raw[col_sss] = df_raw[col_sss].fillna(value=4,)
     # %% re-compute the scores for the SSS
     sit_quest = SituationalSleepinessScale()
     sss_score = [score for score in col_sss if 'score' in score]
     # sss_score[0]: sss_score
     # sss_score[1]: sss_score_div_num_quest 
     df_raw[sss_score[0]] = sit_quest.compute_score(responses=df_raw[col_sss])
-    df_raw[sss_score[1]] = df_raw[sss_score[0]]/10
+    df_raw[sss_score[1]] = sit_quest.compute_score_normalized(responses=df_raw[col_sss])
     if not 'ess_score_div_num_quest' in df_raw.columns:
         col_ess = [col for col in df_raw.columns if not col != 'ess_score' and 'ess' in col]
         df_raw['ess_score_div_num_quest'] = df_raw['ess_score'] / len(col_ess)
@@ -226,5 +243,6 @@ if __name__ == '__main__':
     # # aggregate the organized questionnaires
     # df_raw = pd.concat([df_raw, df_ess, df_sss], axis=1)
     # %% save
+    df_data['batch'] = 'first'
     df_data.to_csv(config.get('data_pp_path').get('first_cross_sectional'),
                   index=False)

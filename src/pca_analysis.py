@@ -808,7 +808,7 @@ if __name__ == '__main__':
     df_pca, df_loadings = pca_interpretation(frame=df_data,
                                              columns=questions_score,
                                              figsize=(12, 12),
-                                             n_components=3,
+                                             n_components=4,
                                              file_name='all_questions',
                                              output_path=output_path_pca,
                                              plot=True)

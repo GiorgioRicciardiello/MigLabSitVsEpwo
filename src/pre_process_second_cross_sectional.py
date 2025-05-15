@@ -31,8 +31,12 @@ def sort_columns(df: pd.DataFrame) -> pd.DataFrame:
 
 if __name__ == '__main__':
     # %% rename columns
-    df_raw = pd.read_excel(config.get('data_raw_path').get('second_cross_sectional'),
-                           sheet_name='split 2- raw')
+    # df_raw = pd.read_excel(config.get('data_raw_path').get('second_cross_sectional'),
+    #                        sheet_name='split 2- raw')
+
+    df_raw = pd.read_excel(config.get('data_raw_path').get('both_cross_sectional'),
+                           sheet_name='feb 2025')
+
     df_raw = df_raw.loc[df_raw['Duplicate'].isna()]
     df_raw.reset_index(inplace=True, drop=True)
     df_raw['email'] = df_raw['email'].astype(str).str.strip().str.lower()
@@ -64,7 +68,10 @@ if __name__ == '__main__':
     df_raw['study_id'] = pd.factorize(df_raw['study_key'])[0] + 1  # Start IDs at 1
     df_raw = df_raw.drop(columns='study_key')
     repeated_names = df_raw[df_raw['full_name'].duplicated(keep=False)]
-
+    # %% drop 10 conversion, here teh dataset is already at 30 minutes
+    assert all(df_raw['sss10_15min'].isna()) == True
+    df_raw.drop(columns=['sss10_15min'], inplace=True)
+    df_raw.rename(columns={'sss10-30min': 'sss10'}, inplace=True)
     # %% Date
     df_date = pd.read_excel(config.get('data_raw_path').get('second_cross_sectional'),
                            sheet_name='split 1- NA removed')
@@ -128,8 +135,30 @@ if __name__ == '__main__':
     df_raw.replace('.',  np.nan, inplace=True)
     # df_raw.replace({np.nan: np.nan}, inplace=True)
     df_raw.dropna(how='all', inplace=True)
-    df_raw.dropna(subset=col_ess, inplace=True)
+    df_raw.dropna(subset=col_ess, inplace=True)  # 1 row
     df_raw[col_ess] = df_raw[col_ess].astype(int)
+
+    df_raw = df_raw.dropna(subset=col_sss, how='all')
+    # %% SSS correction
+    assert int(df_raw[col_sss].isna().sum().sum()) == 1 # one nan in column sss1 (not used for the score)
+
+    assert df_raw[col_sss].max().max() == 6
+    # 1. replace the shifte extra number with nans (6 -> nan)
+    df_raw[col_sss] = df_raw[col_sss].replace({5: np.nan,
+                                               6: np.nan})
+    assert df_raw[col_sss].max().max() == 4
+    # 2. substract and ignore the nan values
+    df_raw[col_sss] = df_raw[col_sss].mask(df_raw[col_sss].notna(), df_raw[col_sss] - 1)
+
+    assert df_raw[col_sss].min().min() == 0
+    assert df_raw[col_sss].max().max() == 3
+
+    # TODO: for the SSS we have 4 and 5, these are not applicable responses, in any of the questions
+    # TODO: Look at the outlier for the correlation
+    # TODO: BLAND ANDMANT PLOT
+    # TODO: PC together between the both
+
+
     # %% convert columns in proper format
     df_raw['dob'] = pd.to_datetime(df_raw['dob'],
                                     errors='coerce')
@@ -158,21 +187,29 @@ if __name__ == '__main__':
     # df_raw.drop(columns=['record_id', 'dob'],
     #             inplace=True)
     # %% compute SS10
-    df_raw.rename(columns={'sss10_30min': 'sss10'}, inplace=True)
-    df_raw.drop(columns=['sss10_15min'],
-                inplace=True)
-    # %% SSS replace nan with not applicable
-    col_sss = [col for col in df_raw.columns if 'sss' in col and ' ' not in col]
-    df_raw[col_sss] = df_raw[col_sss].fillna(value=4)
+
+    # # %% SSS replace nan with not applicable
+    # col_sss = [col for col in df_raw.columns if 'sss' in col and ' ' not in col]
+    # df_subset = df_raw[col_sss]
+    # nan_per_column = df_subset.isna().sum()
+    # subjects_with_nan = df_subset.isna().astype(int)
+    # df_subset.loc[df_subset.isna().sum(1) > 0, :]
+    # print(f'Total subjects with any nan {df_subset.loc[df_subset.isna().sum(1) > 0, :].shape[0]} of {df_raw.shape[0]}')
+    # summary_df = pd.DataFrame({
+    #     'Column': nan_per_column.index,
+    #     'Number of NaNs': nan_per_column.values,
+    #     'Subjects with NaNs': subjects_with_nan.astype(bool).sum(axis=0).values
+    # }).set_index('Column')
+    # print(f'Summary of NaNs per column\n{summary_df}')
     # %% re-compute the scores for the SSS
     sit_quest = SituationalSleepinessScale()
     df_raw['sss_score'] = sit_quest.compute_score(responses=df_raw[col_sss])
-    df_raw['sss_score_div_num_quest'] = df_raw['sss_score']/len(col_sss)
+    df_raw['sss_score_div_num_quest'] = sit_quest.compute_score_normalized(responses=df_raw[col_sss])
     # %% ESS score
     col_ess = [col for col in df_raw.columns if 'ess' in col and ' ' not in col]
     ess_score = EpworthScale()
     df_raw['ess_score'] = ess_score.compute_score(responses=df_raw[col_ess])
-    df_raw['ess_score_div_num_quest'] = df_raw['ess_score']/len(col_ess)
+    df_raw['ess_score_div_num_quest'] = ess_score.compute_score_normalized(responses=df_raw[col_ess])
     # %% clean the diagnosis columns with strings
     col_diagnosis = ['insomnia', 'narc_level', 'rls', 'rmeq']
     df_raw['insomnia'].unique()
@@ -204,6 +241,7 @@ if __name__ == '__main__':
     # drop from original the non-organized version
 
     # %% save
+    df_raw['batch'] = 'second'
     df_raw.to_csv(config.get('data_pp_path').get('second_cross_sectional'),
                   index=False)
 

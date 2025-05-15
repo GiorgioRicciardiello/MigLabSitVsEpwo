@@ -20,7 +20,7 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.cluster import KMeans
 from matplotlib.gridspec import GridSpec
 from utils.functions import pca_interpretation, cronbach_alpha
-
+from tabulate import tabulate
 sns.set_context('poster')
 #  'paper', 'notebook', 'talk', and 'poster'
 
@@ -38,9 +38,24 @@ if __name__ == '__main__':
     df_duplicates = df_data[df_data.duplicated('study_id', keep=False)]
     df_duplicates.sort_values(by=['study_id', 'date'], ascending=[True, False], inplace=True)
     df_data = df_data.drop_duplicates(subset='study_id', keep='first')
+
+    # %% FOR PCA WE NEED TO DROP ROWS THAT ARE ALL NAN
+    questions_score = col_ess + col_sss
+
+    df_data.dropna(subset=questions_score, axis=0, how='any', inplace=True)
+    print(tabulate(
+        df_data[questions_score],
+        headers='keys',
+        tablefmt='psql',
+        showindex=False
+    ))
+    # %%
     df_data.reset_index(drop=True, inplace=True)
+
+
     questions_score = col_ess + col_sss
     cmp_heatmap = sns.color_palette("Spectral_r", as_cmap=True)
+
 
     output_path = config.get('results_path').joinpath('pca_kmeans')
     if not output_path.exists():
@@ -73,7 +88,7 @@ if __name__ == '__main__':
     df_pca, df_loadings = pca_interpretation(frame=df_data,
                                              columns=questions_score,
                                              figsize=(12, 12),
-                                             n_components=2,
+                                             n_components=3,
                                              file_name='two_components',
                                              plot=False)
     # dataframe from poster where we place the desired labels
@@ -124,22 +139,28 @@ if __name__ == '__main__':
     df_pca_ess, df_loadings_ess = pca_interpretation(frame=df_data,
                                                      columns=col_ess,
                                                      figsize=(12, 12),
-                                                     n_components=2,
+                                                     n_components=3,
                                                      file_name='two_components',
                                                      plot=False)
 
     df_pca_sss, df_loadings_sss = pca_interpretation(frame=df_data,
                                                      columns=col_sss,
                                                      figsize=(12, 12),
-                                                     n_components=2,
+                                                     n_components=3,
                                                      file_name='two_components',
                                                      plot=False)
+
+    df_loadings_ess.rename(index=ess_labels, inplace=True)
+    df_loadings_sss.rename(index=sss_labels, inplace=True)
+
+
     # heat map to compare each factor loading
-    fig = plt.figure(figsize=(16, 16))
-    gs = GridSpec(nrows=2, ncols=3, width_ratios=[0.8, 0.8, 1.5], wspace=0.8)  # 2 rows, 3 columns
+    fig = plt.figure(figsize=(20, 16))
+    gs = GridSpec(nrows=2, ncols=3, width_ratios=[0.4, 0.4, 1.5], wspace=2.6)  # 2 rows, 3 columns
     ax1 = fig.add_subplot(gs[0, 0:2])  # First row, first two columns
     ax3 = fig.add_subplot(gs[0:2, 2])  # Both rows, third column
     ax4 = fig.add_subplot(gs[1, 0:2])  # Second row, first two columns
+
 
     sns.heatmap(df_loadings_ess,
                 annot=True,
@@ -149,7 +170,7 @@ if __name__ == '__main__':
                 ax=ax1)
     ax1.set_title('ESS Loadings')
 
-    sns.heatmap(df_loadings[['PC_0', 'PC_1']],
+    sns.heatmap(df_loadings[['PC_0', 'PC_1', 'PC_2']].sort_values(by='PC_0', ascending=False),
                 annot=True,
                 fmt=".2f",
                 cmap=cmp_heatmap,
@@ -235,7 +256,7 @@ if __name__ == '__main__':
     ax3.legend(title='Cluster')
     ax3.grid(True)
     fig.suptitle(t='PCA Projections', fontsize=20, y=0.92)
-    plt.savefig(config.get('results_path').joinpath('PCA_Projection_Kmeans_3Clusters.png'), dpi=300)
+    # plt.savefig(config.get('results_path').joinpath('PCA_Projection_Kmeans_3Clusters.png'), dpi=300)
     plt.show()
 
     # Cluster Validation Metrics

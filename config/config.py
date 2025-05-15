@@ -23,6 +23,7 @@ config = {
     'data_raw_path': {
         'first_cross_sectional': data_raw_path.joinpath('SSS_data_18Apr2024.xlsx'),
         'second_cross_sectional': data_raw_path.joinpath('SSS_data_14Feb2025.xlsx'),
+        'both_cross_sectional': data_raw_path.joinpath('raw_ess_sss_collection_both_batches.xlsx'),
     },
     'data_pp_path': {
         'first_cross_sectional': data_pre_proc_path.joinpath('first_cross_sectional.csv'),

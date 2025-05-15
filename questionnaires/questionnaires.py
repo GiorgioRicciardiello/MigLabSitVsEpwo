@@ -77,8 +77,15 @@ class SituationalSleepinessScale:
         question = [quest for quest in list(self.questionnaire.keys()) if quest not in ['sss_score', 'sss1']]
         df_responses = responses[question].copy()
         # not applicable and prefer not to answer cannot be considered for the score computation
-        df_responses.replace(to_replace=4, value=0, inplace=True)
-        return df_responses.sum(1)
+        return df_responses.where(df_responses <= 3).sum(axis=1)
+
+    def compute_score_normalized(self,
+                      responses: pd.DataFrame) -> pd.Series:
+        """Compute the  SSS Score. We do not want to use ss1 for the score"""
+        question = [quest for quest in list(self.questionnaire.keys()) if quest not in ['sss_score', 'sss1']]
+        df_responses = self.compute_score(responses=responses) / len(question)
+        return df_responses
+
 
     def apply_cut_off(self, col_score:pd.Series) -> int:
         if col_score > 10:
@@ -154,6 +161,11 @@ class EpworthScale:
         """Compute the Epworth Sleepiness Scale (ESS) Score"""
         question = [quest for quest in list(self.questionnaire.keys()) if quest not in ['ess_score']]
         return responses[question].sum(1)
+
+    def compute_score_normalized(self, responses: pd.DataFrame) -> pd.Series:
+        """Compute the Epworth Sleepiness Scale (ESS) Score"""
+        question = [quest for quest in list(self.questionnaire.keys()) if quest not in ['ess_score']]
+        return self.compute_score(responses=responses) / len(question)
 
     def apply_cut_off(self, col_score:pd.Series) -> int:
         if col_score > 10:
